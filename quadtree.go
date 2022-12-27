@@ -1,30 +1,47 @@
 // Package quadtree implements a quadtree for storing arbitrary data.
 package quadtree
 
-import "sort"
-
-type TreeData[T any] struct {
-	data T
+type TreeLeaf[T any] struct {
+	Content T
 	*point
+}
+
+func (td *TreeLeaf[T]) Location() (float64, float64) {
+	return td.x, td.y
 }
 
 type QuadTree[T any] struct {
 	branchSize int
 	capacity   int
-	boundary   *axisAlignedBoundingBox
+	boundary   boundary
 	depth      int
-	data       []*TreeData[T]
+	data       []*TreeLeaf[T]
 	parent     *QuadTree[T]
 	nodes      [4]*QuadTree[T]
 }
 
 func NewQuadTree[T any](x1, y1, x2, y2 float64) *QuadTree[T] {
+	bound := boundary{
+		x1, y1, x2, y2,
+	}
+	bound.align()
+
 	return &QuadTree[T]{
 		capacity: 8,
-		boundary: &axisAlignedBoundingBox{
-			min: &point{x1, y1},
-			max: &point{x2, y2},
-		},
+		boundary: bound,
+	}
+}
+
+// NodeCapacity updates the capacity of the tree to the new value.
+// NodeCapacity can be called on an individual sub-branch of the tree, and will only affect that branch and
+// its children.
+// Setting a node's capacity lower than its current size will not cause the leaf to divide until a new insertion is made
+func (q *QuadTree[T]) NodeCapacity(capacity int) {
+	q.capacity = capacity
+	if q.nodes[0] != nil {
+		for _, node := range q.nodes {
+			node.NodeCapacity(capacity)
+		}
 	}
 }
 
@@ -32,15 +49,15 @@ func (q *QuadTree[T]) divide() {
 	subBounds := q.boundary.SubAreas()
 	// Iterate over the new bounds and create trees
 	for idx, bound := range subBounds {
-		node := NewQuadTree[T](bound.min.x, bound.min.y, bound.max.x, bound.max.y)
+		node := NewQuadTree[T](bound.minX, bound.minY, bound.maxX, bound.maxY)
+		node.capacity = q.capacity
 		node.parent = q
+		node.depth = q.depth + 1
 		q.nodes[idx] = node
-		// Iterate over our non-nil parent data and see if they belong in this node
-		for i, datum := range q.data {
-			if datum != nil && node.boundary.Contains(datum.x, datum.y) {
-				node.data = append(node.data, datum)
-				// Since we assigned it to a sub-node, no need to consider it again
-				q.data[i] = nil
+		for _, data := range q.data {
+			if node.boundary.Contains(data.x, data.y) {
+				node.data = append(node.data, data)
+				node.branchSize++
 			}
 		}
 	}
@@ -52,32 +69,43 @@ func (q *QuadTree[T]) Len() int {
 	return q.branchSize
 }
 
-func (q *QuadTree[T]) Insert(x, y float64, data T) {
-	// Is the data within our boundary? If not, just ignore it.
-	if !q.boundary.Contains(x, y) {
-		return
+func (q *QuadTree[T]) Insert(x, y float64, data T) bool {
+	return q.insert(&TreeLeaf[T]{
+		data,
+		&point{x, y},
+	})
+}
+
+func (q *QuadTree[T]) insert(leaf *TreeLeaf[T]) bool {
+	// Is the Data within our boundary? If not, just ignore it.
+	if !q.boundary.Contains(leaf.x, leaf.y) {
+		return false
 	}
 
-	// Are we a leaf node?
+	// If we're a leaf node...
 	if q.nodes[0] == nil {
-		q.branchSize++
-		// Yes, but do we have capacity?
-		if len(q.data) == q.capacity {
-			// We are at capacity, divide
+		// Are we maxed out?
+		if len(q.data) >= q.capacity {
+			// we are, split
 			q.divide()
 		} else {
-			// we are NOT at capacity. Slot it in
-			q.data = append(q.data, &TreeData[T]{
-				data:  data,
-				point: &point{x, y},
-			})
+			// we're not, add to our own list and return
+			q.data = append(q.data, leaf)
+			q.branchSize++
+			return true
 		}
 	}
 
-	// If we got here, we are NOT a leaf node. Ask our kids to store the data
-	for i := 0; i < 4; i++ {
-		q.nodes[i].Insert(x, y, data)
+	// If we got here, we have children to do this task for us!
+	for _, node := range q.nodes {
+		if node.insert(leaf) {
+			q.branchSize++
+			return true
+		}
 	}
+
+	// This return should NEVER be hit,
+	return false
 }
 
 func (q *QuadTree[T]) leafContaining(x, y float64) *QuadTree[T] {
@@ -98,19 +126,19 @@ func (q *QuadTree[T]) leafContaining(x, y float64) *QuadTree[T] {
 	return nil
 }
 
-func (q *QuadTree[T]) collectChildren() []*TreeData[T] {
-	data := make([]*TreeData[T], 0, q.branchSize)
+func (q *QuadTree[T]) collectChildren() []*TreeLeaf[T] {
+	data := make([]*TreeLeaf[T], 0, q.branchSize)
 	data = append(data, q.data...)
 	if q.nodes[0] != nil {
 		for _, node := range q.nodes {
-			data = append(node.collectChildren())
+			data = append(data, node.collectChildren()...)
 		}
 	}
 	return data
 }
 
 // FindNearest returns up to count elements, sorted by distance to (x,y)
-func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeData[T] {
+func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeLeaf[T] {
 	leafNode := q.leafContaining(x, y)
 	if leafNode == nil {
 		return nil
@@ -120,16 +148,41 @@ func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeData[T] {
 		leafNode = leafNode.parent
 	}
 	// Sort 'em
-	data := dataByDistance[T]{
-		points: leafNode.collectChildren(),
-		origin: &point{x, y},
-	}
-	sort.Sort(data)
+	data := sortDataByDistance(&point{x, y}, leafNode.collectChildren())
 
 	// if we got too many, slice 'em up
-	if len(data.points) > count {
-		data.points = data.points[:count]
+	if len(data) > count {
+		data = data[:count]
 	}
-	
-	return data.points
+
+	return data
+}
+
+// FindWithin returns all data within the tree contained by the specified bounding box
+func (q *QuadTree[T]) FindWithin(x1, y1, x2, y2 float64) []*TreeLeaf[T] {
+	boundary := boundary{x1, y1, x2, y2}
+	boundary.align()
+	return q.findWithin(boundary)
+}
+
+func (q *QuadTree[T]) findWithin(bb boundary) []*TreeLeaf[T] {
+	if !q.boundary.Intersects(bb) {
+		return nil
+	}
+	result := make([]*TreeLeaf[T], 0, q.branchSize)
+	if len(q.data) > 0 {
+		for _, data := range q.data {
+			if bb.Contains(data.x, data.y) {
+				result = append(result, data)
+			}
+		}
+	} else {
+		for _, node := range q.nodes {
+			if node != nil {
+				result = append(result, node.findWithin(bb)...)
+			}
+		}
+	}
+
+	return result
 }

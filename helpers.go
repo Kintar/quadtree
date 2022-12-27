@@ -8,7 +8,7 @@ func distanceSquared(p1, p2 *point) float64 {
 	return dx*dx + dy*dy
 }
 
-func sortDataByDistance[T any](origin *point, leafs []*TreeData[T]) []*TreeData[T] {
+func sortDataByDistance[T any](origin *point, leafs []*TreeLeaf[T]) []*TreeLeaf[T] {
 	pts := dataByDistance[T]{origin, leafs}
 	sort.Sort(pts)
 	return pts.points
@@ -16,7 +16,7 @@ func sortDataByDistance[T any](origin *point, leafs []*TreeData[T]) []*TreeData[
 
 type dataByDistance[T any] struct {
 	origin *point
-	points []*TreeData[T]
+	points []*TreeLeaf[T]
 }
 
 func (p dataByDistance[T]) Len() int {
