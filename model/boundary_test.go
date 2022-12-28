@@ -8,8 +8,8 @@ import (
 func TestNewBoundSquare(t *testing.T) {
 	b := NewBoundSquare(50, 50, 100)
 	expected := BoundingSquare{
-		cx:     50,
-		cy:     50,
+		CX:     50,
+		CY:     50,
 		extent: 50,
 		size:   100,
 	}
@@ -19,8 +19,8 @@ func TestNewBoundSquare(t *testing.T) {
 func TestNewBoundSquareFromCorner(t *testing.T) {
 	b := NewBoundSquareFromCorner(0, 0, 100)
 	expected := BoundingSquare{
-		cx:     50,
-		cy:     50,
+		CX:     50,
+		CY:     50,
 		extent: 50,
 		size:   100,
 	}
@@ -85,4 +85,14 @@ func TestBoundingCircle_Contains(t *testing.T) {
 	c := NewBoundingCircle(50, 50, 20)
 	assert.True(t, c.Contains(40, 40))
 	assert.False(t, c.Contains(80, 50))
+}
+
+func TestBoundingCircle_Radius(t *testing.T) {
+	c := NewBoundingCircle(50, 50, 20)
+	assert.Equal(t, 20.0, c.Radius())
+}
+
+func TestBoundingSquare_Size(t *testing.T) {
+	b := NewBoundSquare(150, 150, 100)
+	assert.Equal(t, 100.0, b.size)
 }

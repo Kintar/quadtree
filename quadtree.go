@@ -1,6 +1,10 @@
 // Package quadtree implements a quadtree for storing arbitrary data.
 package quadtree
 
+import (
+	"github.com/kintar/quadtree/model"
+)
+
 type TreeLeaf[T any] struct {
 	Content T
 	*point
@@ -13,22 +17,19 @@ func (td *TreeLeaf[T]) Location() (float64, float64) {
 type QuadTree[T any] struct {
 	branchSize int
 	capacity   int
-	boundary   boundary
+	boundary   model.BoundingSquare
 	depth      int
 	data       []*TreeLeaf[T]
 	parent     *QuadTree[T]
 	nodes      [4]*QuadTree[T]
 }
 
-func NewQuadTree[T any](x1, y1, x2, y2 float64) *QuadTree[T] {
-	bound := boundary{
-		x1, y1, x2, y2,
-	}
-	bound.align()
+func NewQuadTree[T any](cx, cy, size float64) *QuadTree[T] {
+	bounds := model.NewBoundSquare(cx, cy, size)
 
 	return &QuadTree[T]{
 		capacity: 8,
-		boundary: bound,
+		boundary: bounds,
 	}
 }
 
@@ -46,10 +47,10 @@ func (q *QuadTree[T]) NodeCapacity(capacity int) {
 }
 
 func (q *QuadTree[T]) divide() {
-	subBounds := q.boundary.SubAreas()
+	subBounds := model.Subdivide(q.boundary)
 	// Iterate over the new bounds and create trees
 	for idx, bound := range subBounds {
-		node := NewQuadTree[T](bound.minX, bound.minY, bound.maxX, bound.maxY)
+		node := NewQuadTree[T](bound.CX, bound.CY, bound.Size())
 		node.capacity = q.capacity
 		node.parent = q
 		node.depth = q.depth + 1
@@ -158,14 +159,7 @@ func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeLeaf[T] {
 	return data
 }
 
-// FindWithin returns all data within the tree contained by the specified bounding box
-func (q *QuadTree[T]) FindWithin(x1, y1, x2, y2 float64) []*TreeLeaf[T] {
-	boundary := boundary{x1, y1, x2, y2}
-	boundary.align()
-	return q.findWithin(boundary)
-}
-
-func (q *QuadTree[T]) findWithin(bb boundary) []*TreeLeaf[T] {
+func (q *QuadTree[T]) FindWithin(bb model.BoundingSquare) []*TreeLeaf[T] {
 	if !q.boundary.Intersects(bb) {
 		return nil
 	}
@@ -179,7 +173,7 @@ func (q *QuadTree[T]) findWithin(bb boundary) []*TreeLeaf[T] {
 	} else {
 		for _, node := range q.nodes {
 			if node != nil {
-				result = append(result, node.findWithin(bb)...)
+				result = append(result, node.FindWithin(bb)...)
 			}
 		}
 	}

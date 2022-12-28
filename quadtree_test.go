@@ -2,19 +2,20 @@ package quadtree
 
 import (
 	"fmt"
+	"github.com/kintar/quadtree/model"
 	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
 )
 
 func TestQuadTree_Insert_BasicFunctionality(t *testing.T) {
-	qt := NewQuadTree[int](0, 0, 100, 100)
+	qt := NewQuadTree[int](50, 50, 100)
 	qt.Insert(50, 50, 1)
 	assert.EqualValues(t, 1, len(qt.data))
 }
 
 func TestQuadTree_Insert_DividesAtCapacity(t *testing.T) {
-	qt := NewQuadTree[int](0, 0, 100, 100)
+	qt := NewQuadTree[int](50, 50, 100)
 	for i := 0; i < qt.capacity+2; i++ {
 		qt.Insert(50, float64(i), i)
 	}
@@ -24,7 +25,7 @@ func TestQuadTree_Insert_DividesAtCapacity(t *testing.T) {
 }
 
 func TestQuadTree_Len(t *testing.T) {
-	qt := NewQuadTree[int](0, 0, 100, 100)
+	qt := NewQuadTree[int](50, 50, 100)
 	const count = 10
 	for i := 0; i < count; i++ {
 		qt.Insert(51, float64(i), i)
@@ -33,7 +34,7 @@ func TestQuadTree_Len(t *testing.T) {
 }
 
 func TestQuadTree_collectChildren(t *testing.T) {
-	qt := NewQuadTree[int](0, 0, 100, 100)
+	qt := NewQuadTree[int](50, 50, 100)
 	const count = 10
 	for i := 0; i < count; i++ {
 		qt.Insert(51, float64(i), i)
@@ -50,7 +51,7 @@ func TestQuadTree_Insert_HighCapacity(t *testing.T) {
 		}
 	}()
 
-	qt := NewQuadTree[string](0, 0, 200, 200)
+	qt := NewQuadTree[string](50, 50, 100)
 	for y := 0.0; y < 200; y += 10 {
 		for x := 0.0; x < 200; x += 10 {
 			qt.Insert(x, y, fmt.Sprintf("%.0f, %.0f", x, y))
@@ -59,7 +60,7 @@ func TestQuadTree_Insert_HighCapacity(t *testing.T) {
 }
 
 func TestQuadTree_FindNearest(t *testing.T) {
-	qt := NewQuadTree[string](0, 0, 200, 200)
+	qt := NewQuadTree[string](100, 100, 200)
 	for y := 0.0; y < 200; y += 10 {
 		for x := 0.0; x < 200; x += 10 {
 			qt.Insert(x, y, fmt.Sprintf("%.0f, %.0f", x, y))
@@ -85,13 +86,13 @@ func TestQuadTree_FindNearest(t *testing.T) {
 }
 
 func TestQuadTree_FindWithin(t *testing.T) {
-	qt := NewQuadTree[string](0, 0, 200, 200)
+	qt := NewQuadTree[string](100, 100, 200)
 	for y := 0.0; y < 200; y += 10 {
 		for x := 0.0; x < 200; x += 10 {
 			qt.Insert(x, y, fmt.Sprintf("%.0f, %.0f", x, y))
 		}
 	}
-	resultLeafs := qt.FindWithin(10, 10, 30, 30)
+	resultLeafs := qt.FindWithin(model.NewBoundSquare(20, 20, 20))
 	results := make([]string, len(resultLeafs))
 	for i, rl := range resultLeafs {
 		results[i] = rl.Content
