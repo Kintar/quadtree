@@ -72,13 +72,13 @@ func (q *QuadTree[T]) Len() int {
 }
 
 func (q *QuadTree[T]) Insert(x, y float64, data T) bool {
-	return q.insert(&TreeLeaf[T]{
+	return q.internalInsert(&TreeLeaf[T]{
 		data,
 		&point{x, y},
 	})
 }
 
-func (q *QuadTree[T]) insert(leaf *TreeLeaf[T]) bool {
+func (q *QuadTree[T]) internalInsert(leaf *TreeLeaf[T]) bool {
 	// Is the Data within our boundary? If not, just ignore it.
 	if !q.boundary.Contains(leaf.x, leaf.y) {
 		return false
@@ -100,7 +100,7 @@ func (q *QuadTree[T]) insert(leaf *TreeLeaf[T]) bool {
 
 	// If we got here, we have children to do this task for us!
 	for _, node := range q.nodes {
-		if node.insert(leaf) {
+		if node.internalInsert(leaf) {
 			q.branchSize++
 			return true
 		}
@@ -145,19 +145,42 @@ func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeLeaf[T] {
 	if leafNode == nil {
 		return nil
 	}
-	// walk up the tree until we find a node with at least count children, or we run out of tree
-	for leafNode.branchSize <= count && leafNode.parent != nil {
+
+	// This lets us determine how many splits have been made to the quadtree, which in turn will tell us the
+	// minimum radius around this search point that will intersect at least four nodes. Those nodes MIGHT be within
+	// the same division quadrant, or they might not, so in order to actually search them, we have to run a
+	// FindWithinCircle centered on the search point with a radius that encompasses the center of the node one depth
+	// above our search target.
+	searchNode := leafNode
+	if leafNode.parent != nil {
+		searchNode = leafNode.parent
+	}
+
+	// TODO: I'm sure this is not efficient, but it's not a problem yet, so no optimization until it is!
+	var results []*TreeLeaf[T]
+	// Step up one parent level at a time until we either find the correct number of items or run out of tree
+	for len(results) < count {
+		// If we're searching a node with no parent, we just want to search the entire node, not some specific radius
+		radius := searchNode.boundary.Size()
+		// But if we're searching a node with parents, we want to limit the search radius
+		if searchNode != leafNode {
+			rx, ry := searchNode.boundary.Location2D()
+			radius = distance(x, y, rx, ry)
+		}
+
+		results = q.FindWithinCircle(model.NewBoundingCircle(x, y, radius))
+		if leafNode.parent == nil {
+			break
+		}
 		leafNode = leafNode.parent
 	}
-	// Sort 'em
-	data := sortDataByDistance(x, y, leafNode.collectChildren())
 
-	// if we got too many, slice 'em up
-	if len(data) > count {
-		data = data[:count]
+	// If we have too many, sort by distance from search target and snip off the excess
+	if len(results) > count {
+		results = sortDataByDistance(x, y, results)[:count]
 	}
 
-	return data
+	return results
 }
 
 func (q *QuadTree[T]) FindWithinSquare(bb model.BoundingSquare) []*TreeLeaf[T] {

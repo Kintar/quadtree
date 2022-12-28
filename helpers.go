@@ -1,11 +1,28 @@
 package quadtree
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
-func distanceSquared(p1, p2 *point) float64 {
+func pointDistanceSquared(p1, p2 *point) float64 {
 	dx := p1.x - p2.x
 	dy := p1.y - p2.y
 	return dx*dx + dy*dy
+}
+
+func pointDistance(p1, p2 *point) float64 {
+	return math.Sqrt(pointDistanceSquared(p1, p2))
+}
+
+func distanceSquared(x1, y1, x2, y2 float64) float64 {
+	dx := x1 - x2
+	dy := y1 - y2
+	return dx*dx + dy*dy
+}
+
+func distance(x1, y1, x2, y2 float64) float64 {
+	return math.Sqrt(distanceSquared(x1, y1, x2, y2))
 }
 
 func sortDataByDistance[T any](x, y float64, leafs []*TreeLeaf[T]) []*TreeLeaf[T] {
@@ -24,7 +41,7 @@ func (p dataByDistance[T]) Len() int {
 }
 
 func (p dataByDistance[T]) Less(i, j int) bool {
-	return distanceSquared(p.origin, p.points[i].point) < distanceSquared(p.origin, p.points[i].point)
+	return pointDistanceSquared(p.origin, p.points[i].point) < pointDistanceSquared(p.origin, p.points[j].point)
 }
 
 func (p dataByDistance[T]) Swap(i, j int) {
