@@ -50,7 +50,8 @@ func (q *QuadTree[T]) divide() {
 	subBounds := model.Subdivide(q.boundary)
 	// Iterate over the new bounds and create trees
 	for idx, bound := range subBounds {
-		node := NewQuadTree[T](bound.CX, bound.CY, bound.Size())
+		x, y := bound.Location2D()
+		node := NewQuadTree[T](x, y, bound.Size())
 		node.capacity = q.capacity
 		node.parent = q
 		node.depth = q.depth + 1
@@ -149,7 +150,7 @@ func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeLeaf[T] {
 		leafNode = leafNode.parent
 	}
 	// Sort 'em
-	data := sortDataByDistance(&point{x, y}, leafNode.collectChildren())
+	data := sortDataByDistance(x, y, leafNode.collectChildren())
 
 	// if we got too many, slice 'em up
 	if len(data) > count {
@@ -159,7 +160,7 @@ func (q *QuadTree[T]) FindNearest(x, y float64, count int) []*TreeLeaf[T] {
 	return data
 }
 
-func (q *QuadTree[T]) FindWithin(bb model.BoundingSquare) []*TreeLeaf[T] {
+func (q *QuadTree[T]) FindWithinSquare(bb model.BoundingSquare) []*TreeLeaf[T] {
 	if !q.boundary.Intersects(bb) {
 		return nil
 	}
@@ -173,10 +174,33 @@ func (q *QuadTree[T]) FindWithin(bb model.BoundingSquare) []*TreeLeaf[T] {
 	} else {
 		for _, node := range q.nodes {
 			if node != nil {
-				result = append(result, node.FindWithin(bb)...)
+				result = append(result, node.FindWithinSquare(bb)...)
 			}
 		}
 	}
 
 	return result
+}
+
+func (q *QuadTree[T]) FindWithinCircle(c model.BoundingCircle) []*TreeLeaf[T] {
+	if !q.boundary.IntersectsCircle(c) {
+		return nil
+	}
+	result := make([]*TreeLeaf[T], 0, q.branchSize)
+	if len(q.data) > 0 {
+		for _, data := range q.data {
+			if c.Contains(data.x, data.y) {
+				result = append(result, data)
+			}
+		}
+	} else {
+		for _, node := range q.nodes {
+			if node != nil {
+				result = append(result, node.FindWithinCircle(c)...)
+			}
+		}
+	}
+
+	x, y := c.Location2D()
+	return sortDataByDistance[T](x, y, result)
 }

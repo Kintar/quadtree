@@ -8,8 +8,8 @@ import (
 func TestNewBoundSquare(t *testing.T) {
 	b := NewBoundSquare(50, 50, 100)
 	expected := BoundingSquare{
-		CX:     50,
-		CY:     50,
+		cx:     50,
+		cy:     50,
 		extent: 50,
 		size:   100,
 	}
@@ -19,8 +19,8 @@ func TestNewBoundSquare(t *testing.T) {
 func TestNewBoundSquareFromCorner(t *testing.T) {
 	b := NewBoundSquareFromCorner(0, 0, 100)
 	expected := BoundingSquare{
-		CX:     50,
-		CY:     50,
+		cx:     50,
+		cy:     50,
 		extent: 50,
 		size:   100,
 	}

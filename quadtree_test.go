@@ -85,14 +85,14 @@ func TestQuadTree_FindNearest(t *testing.T) {
 	assert.EqualValues(t, expected, results)
 }
 
-func TestQuadTree_FindWithin(t *testing.T) {
+func TestQuadTree_FindWithinSquare(t *testing.T) {
 	qt := NewQuadTree[string](100, 100, 200)
 	for y := 0.0; y < 200; y += 10 {
 		for x := 0.0; x < 200; x += 10 {
 			qt.Insert(x, y, fmt.Sprintf("%.0f, %.0f", x, y))
 		}
 	}
-	resultLeafs := qt.FindWithin(model.NewBoundSquare(20, 20, 20))
+	resultLeafs := qt.FindWithinSquare(model.NewBoundSquare(20, 20, 20))
 	results := make([]string, len(resultLeafs))
 	for i, rl := range resultLeafs {
 		results[i] = rl.Content
@@ -102,6 +102,32 @@ func TestQuadTree_FindWithin(t *testing.T) {
 		"20, 10",
 		"10, 20",
 		"20, 20",
+	}
+
+	sort.Strings(expected)
+	sort.Strings(results)
+	assert.EqualValues(t, expected, results)
+
+}
+
+func TestQuadTree_FindWithinCircle(t *testing.T) {
+	qt := NewQuadTree[string](100, 100, 200)
+	for y := 0.0; y < 200; y += 10 {
+		for x := 0.0; x < 200; x += 10 {
+			qt.Insert(x, y, fmt.Sprintf("%.0f, %.0f", x, y))
+		}
+	}
+	resultLeafs := qt.FindWithinCircle(model.NewBoundingCircle(20, 20, 12))
+	results := make([]string, len(resultLeafs))
+	for i, rl := range resultLeafs {
+		results[i] = rl.Content
+	}
+	expected := []string{
+		"10, 20",
+		"20, 10",
+		"20, 20",
+		"20, 30",
+		"30, 20",
 	}
 
 	sort.Strings(expected)
