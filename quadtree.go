@@ -227,3 +227,37 @@ func (q *QuadTree[T]) FindWithinCircle(c model.BoundingCircle) []*TreeLeaf[T] {
 	x, y := c.Location2D()
 	return sortDataByDistance[T](x, y, result)
 }
+
+func (q *QuadTree[T]) AllChildren() []T {
+	var response []T
+	for _, node := range q.collectChildren() {
+		response = append(response, node.Content)
+	}
+	return response
+}
+
+type TreeVisitorFunc[T any] func(*TreeLeaf[T]) error
+
+// VisitWithinSquare applies a visitor function to every node entry within the given bounding square.
+// If the function returns an error, this function immediately returns the error
+func (q *QuadTree[T]) VisitWithinSquare(b model.BoundingSquare, visitorFunc TreeVisitorFunc[T]) error {
+	var err error
+	for _, child := range q.FindWithinSquare(b) {
+		if err = visitorFunc(child); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// VisitWithinCircle applies a visitor function to every node entry within the given bounding circle.
+// If the function returns an error, this function immediately returns the error
+func (q *QuadTree[T]) VisitWithinCircle(c model.BoundingCircle, visitorFunc TreeVisitorFunc[T]) error {
+	var err error
+	for _, child := range q.FindWithinCircle(c) {
+		if err = visitorFunc(child); err != nil {
+			return err
+		}
+	}
+	return nil
+}
