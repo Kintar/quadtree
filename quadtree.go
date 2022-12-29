@@ -261,3 +261,11 @@ func (q *QuadTree[T]) VisitWithinCircle(c model.BoundingCircle, visitorFunc Tree
 	}
 	return nil
 }
+
+func (q *QuadTree[T]) Center() (float64, float64) {
+	return q.boundary.Location2D()
+}
+
+func (q *QuadTree[T]) Size() float64 {
+	return q.boundary.Size()
+}
